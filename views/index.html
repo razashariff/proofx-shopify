@@ -497,31 +497,13 @@
     }
 
     // ---------------------------------------------------------------------------
-    // Download protected image (blob download to bypass iframe restrictions)
+    // Download protected image — uses top-level window.open to bypass App Bridge
     // ---------------------------------------------------------------------------
-    async function downloadImage(contentId, productTitle) {
-      try {
-        const url = `${APP_HOST}/api/download/${encodeURIComponent(contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Download failed");
-
-        const blob = await res.blob();
-        const ext = blob.type.includes("jpeg") ? ".jpg" : blob.type.includes("webp") ? ".webp" : ".png";
-        const safeName = (productTitle || "image").replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "-").substring(0, 50);
-        const fileName = `ProofX-${safeName}-${contentId}${ext}`;
-
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(a.href);
-
-        showToast(`Downloaded: ${fileName}`);
-      } catch (err) {
-        showToast("Download failed: " + err.message, "error");
-      }
+    function downloadImage(contentId, productTitle) {
+      const url = `${APP_HOST}/api/download/${encodeURIComponent(contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}`;
+      // Open in top-level window — bypasses Shopify App Bridge interception.
+      // Server returns Content-Disposition: attachment so browser downloads the file.
+      window.top.open(url, '_blank');
     }
 
     // ---------------------------------------------------------------------------
