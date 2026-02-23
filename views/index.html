@@ -343,12 +343,9 @@
           </td>
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <a href="${img.hasProtectedFile
-                ? '/api/download/' + encodeURIComponent(img.contentId)
-                : escapeHtml(img.imageSrc)}"
+              <a href="/api/download/${encodeURIComponent(img.contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}"
                  class="btn btn-primary btn-sm"
-                 title="${img.hasProtectedFile ? 'Download watermarked image' : 'Download original image'}"
-                 download="${img.hasProtectedFile ? 'proofx-' + escapeHtml(img.contentId) + '.png' : ''}">
+                 title="Download protected image">
                 Download
               </a>
               <button class="btn btn-secondary btn-sm" onclick="verifyContent('${escapeHtml(img.contentId)}')">

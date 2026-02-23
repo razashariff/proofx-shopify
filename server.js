@@ -630,29 +630,74 @@ app.post("/api/settings", verifyShopSession, (req, res) => {
   res.json({ success: true, message: "Settings saved" });
 });
 
-// Download protected (watermarked) image
-app.get("/api/download/:contentId", (req, res) => {
-  const filePath = getProtectedFilePath(req.params.contentId);
-  if (!filePath) {
-    return res.status(404).json({
-      error: "Protected file not found. It may not have been watermarked.",
-    });
+// Download protected image — serves local watermarked file or proxies from Shopify CDN
+app.get("/api/download/:contentId", async (req, res) => {
+  const contentId = req.params.contentId;
+
+  // 1. Check for local watermarked file first
+  const filePath = getProtectedFilePath(contentId);
+  if (filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const mime =
+      ext === ".jpg" || ext === ".jpeg"
+        ? "image/jpeg"
+        : ext === ".webp"
+        ? "image/webp"
+        : "image/png";
+
+    res.setHeader("Content-Type", mime);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="proofx-${contentId}${ext}"`
+    );
+    return res.sendFile(filePath);
   }
 
-  const ext = path.extname(filePath).toLowerCase();
-  const mime =
-    ext === ".jpg" || ext === ".jpeg"
-      ? "image/jpeg"
-      : ext === ".webp"
-      ? "image/webp"
-      : "image/png";
+  // 2. No local file — find the original image URL and proxy it
+  const shop = req.query.shop;
+  const shopData = shop ? getShop(shop) : null;
+  let imageSrc = null;
 
-  res.setHeader("Content-Type", mime);
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="proofx-${req.params.contentId}${ext}"`
-  );
-  res.sendFile(filePath);
+  if (shopData) {
+    const entry = (shopData.protectedImages || []).find(
+      (p) => p.contentId === contentId
+    );
+    if (entry) imageSrc = entry.imageSrc;
+  } else {
+    // Search all shops
+    for (const s of Object.values(shops)) {
+      const entry = (s.protectedImages || []).find(
+        (p) => p.contentId === contentId
+      );
+      if (entry) { imageSrc = entry.imageSrc; break; }
+    }
+  }
+
+  if (!imageSrc) {
+    return res.status(404).json({ error: "Image not found" });
+  }
+
+  try {
+    const imgRes = await fetch(imageSrc);
+    if (!imgRes.ok) throw new Error(`Fetch failed: ${imgRes.status}`);
+
+    const ext = path.extname(new URL(imageSrc).pathname).toLowerCase() || ".png";
+    const mime =
+      ext === ".jpg" || ext === ".jpeg"
+        ? "image/jpeg"
+        : ext === ".webp"
+        ? "image/webp"
+        : "image/png";
+
+    res.setHeader("Content-Type", mime);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="proofx-${contentId}${ext}"`
+    );
+    imgRes.body.pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to download image" });
+  }
 });
 
 // Verify a content ID
