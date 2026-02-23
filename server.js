@@ -154,7 +154,15 @@ async function proofxSignHash({ contentHash, creatorId, apiKey, title }) {
     throw new Error(`ProofX sign-hash failed (${res.status}): ${text}`);
   }
 
-  return res.json();
+  const data = await res.json();
+
+  if (!data.success) {
+    throw new Error(
+      data.message || data.error || "ProofX sign-hash returned success=false"
+    );
+  }
+
+  return data;
 }
 
 async function proofxVerify(contentId) {
