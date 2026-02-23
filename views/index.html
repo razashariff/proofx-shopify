@@ -497,13 +497,18 @@
     }
 
     // ---------------------------------------------------------------------------
-    // Download protected image — uses top-level window.open to bypass App Bridge
+    // Download protected image — uses App Bridge Redirect to open outside iframe
     // ---------------------------------------------------------------------------
     function downloadImage(contentId, productTitle) {
       const url = `${APP_HOST}/api/download/${encodeURIComponent(contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}`;
-      // Open in top-level window — bypasses Shopify App Bridge interception.
-      // Server returns Content-Disposition: attachment so browser downloads the file.
-      window.top.open(url, '_blank');
+      // Use Shopify App Bridge Redirect (official way to open URLs from embedded apps)
+      if (appBridge && window['app-bridge'] && window['app-bridge'].actions) {
+        const redirect = window['app-bridge'].actions.Redirect.create(appBridge);
+        redirect.dispatch(window['app-bridge'].actions.Redirect.Action.REMOTE, url);
+      } else {
+        // Fallback for non-embedded context
+        window.open(url, '_blank');
+      }
     }
 
     // ---------------------------------------------------------------------------
