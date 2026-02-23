@@ -34,6 +34,7 @@ const {
 
 const PROOFX_API_BASE = "https://api.proofx.co.uk";
 const SHOPS_FILE = process.env.SHOPS_FILE || path.join(__dirname, "shops.json");
+const PROTECTED_DIR = process.env.PROTECTED_DIR || path.join(__dirname, "protected");
 const PORT = process.env.PORT || 3000;
 
 if (!SHOPIFY_API_KEY || !SHOPIFY_API_SECRET || !HOST) {
@@ -165,6 +166,82 @@ async function proofxSignHash({ contentHash, creatorId, apiKey, title }) {
   return data;
 }
 
+/**
+ * Full protection: upload image → backend watermarks + signs → download protected file.
+ * Same flow as proofx.co.uk/protect.
+ */
+async function proofxRegister({ imageBuffer, fileName, creatorId, title }) {
+  // Build multipart form data
+  const FormData = require("form-data");
+  const form = new FormData();
+  form.append("file", imageBuffer, { filename: fileName, contentType: "image/png" });
+  form.append("creator_id", creatorId);
+  form.append("title", title || "Shopify Product Image");
+
+  const res = await fetch(`${PROOFX_API_BASE}/api/content/register`, {
+    method: "POST",
+    body: form,
+    headers: form.getHeaders(),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`ProofX register failed (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+
+  if (!data.success) {
+    // If exact match, the content was already protected — return data with the existing content_id
+    if (data.error === "exact_match" && data.content_id) {
+      return { ...data, alreadyProtected: true };
+    }
+    throw new Error(
+      data.message || data.error || "ProofX register returned success=false"
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Download the watermarked+signed image from ProofX (one-time download).
+ */
+async function proofxDownloadProtected(contentId) {
+  const res = await fetch(
+    `${PROOFX_API_BASE}/api/content/${contentId}/download`
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`ProofX download failed (${res.status}): ${text}`);
+  }
+
+  return res.buffer();
+}
+
+/**
+ * Save protected image to persistent storage.
+ */
+function saveProtectedFile(contentId, buffer, fileName) {
+  const dir = path.join(PROTECTED_DIR);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const ext = path.extname(fileName) || ".png";
+  const filePath = path.join(dir, `${contentId}${ext}`);
+  fs.writeFileSync(filePath, buffer);
+  return filePath;
+}
+
+function getProtectedFilePath(contentId) {
+  const dir = PROTECTED_DIR;
+  if (!fs.existsSync(dir)) return null;
+  const files = fs.readdirSync(dir).filter((f) => f.startsWith(contentId));
+  if (files.length === 0) return null;
+  return path.join(dir, files[0]);
+}
+
 async function proofxVerify(contentId) {
   const res = await fetch(
     `${PROOFX_API_BASE}/api/content/${contentId}/verify`
@@ -223,17 +300,38 @@ async function protectProductImages(shop, product) {
 
     try {
       const buffer = await downloadImage(image.src);
-      const hash = await sha256Hex(buffer);
-      const title = `${product.title} - ${path.basename(
-        new URL(image.src).pathname
-      )}`;
+      const fileName = path.basename(new URL(image.src).pathname) || "image.png";
+      const title = `${product.title} - ${fileName}`;
 
-      const result = await proofxSignHash({
-        contentHash: hash,
+      // Full protection: upload → watermark + sign → download protected version
+      const result = await proofxRegister({
+        imageBuffer: buffer,
+        fileName,
         creatorId,
-        apiKey,
         title,
       });
+
+      let protectedFile = null;
+
+      if (result.alreadyProtected) {
+        // Content was previously protected — we have the content_id but no new download
+        console.log(
+          `  Image ${image.id} was already protected -> content_id: ${result.content_id}`
+        );
+      } else {
+        // Newly protected — immediately download the watermarked+signed file (one-time)
+        try {
+          const protectedBuffer = await proofxDownloadProtected(result.content_id);
+          protectedFile = saveProtectedFile(result.content_id, protectedBuffer, fileName);
+          console.log(
+            `  Saved protected file: ${protectedFile} (${protectedBuffer.length} bytes)`
+          );
+        } catch (dlErr) {
+          console.warn(
+            `  Warning: Could not download protected file: ${dlErr.message}`
+          );
+        }
+      }
 
       const entry = {
         contentId: result.content_id,
@@ -241,14 +339,16 @@ async function protectProductImages(shop, product) {
         productTitle: product.title,
         imageId: image.id,
         imageSrc: image.src,
-        hash,
-        signature: result.signature,
-        protectedAt: new Date().toISOString(),
+        hash: result.exact_hash || "",
+        signature: result.signature || "",
+        watermarked: !result.alreadyProtected,
+        hasProtectedFile: !!protectedFile,
+        protectedAt: result.registered_at || new Date().toISOString(),
       };
 
       newProtected.push(entry);
       console.log(
-        `  Protected image ${image.id} -> content_id: ${result.content_id}`
+        `  Protected image ${image.id} -> content_id: ${result.content_id} (watermarked: ${!!protectedFile})`
       );
     } catch (err) {
       console.error(`  Failed to protect image ${image.id}:`, err.message);
@@ -528,6 +628,31 @@ app.post("/api/settings", verifyShopSession, (req, res) => {
   setShop(req.shopDomain, updates);
 
   res.json({ success: true, message: "Settings saved" });
+});
+
+// Download protected (watermarked) image
+app.get("/api/download/:contentId", (req, res) => {
+  const filePath = getProtectedFilePath(req.params.contentId);
+  if (!filePath) {
+    return res.status(404).json({
+      error: "Protected file not found. It may not have been watermarked.",
+    });
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const mime =
+    ext === ".jpg" || ext === ".jpeg"
+      ? "image/jpeg"
+      : ext === ".webp"
+      ? "image/webp"
+      : "image/png";
+
+  res.setHeader("Content-Type", mime);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="proofx-${req.params.contentId}${ext}"`
+  );
+  res.sendFile(filePath);
 });
 
 // Verify a content ID

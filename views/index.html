@@ -342,8 +342,13 @@
             ${formatDate(img.protectedAt)}
           </td>
           <td>
-            <div style="display:flex;gap:4px">
-              <button class="btn btn-primary btn-sm" onclick="verifyContent('${escapeHtml(img.contentId)}')">
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              ${img.hasProtectedFile ? `
+              <a href="/api/download/${encodeURIComponent(img.contentId)}"
+                 class="btn btn-primary btn-sm" title="Download watermarked image">
+                Download
+              </a>` : ""}
+              <button class="btn btn-secondary btn-sm" onclick="verifyContent('${escapeHtml(img.contentId)}')">
                 Verify
               </button>
               <a href="https://proofx.co.uk/verify?id=${encodeURIComponent(img.contentId)}"

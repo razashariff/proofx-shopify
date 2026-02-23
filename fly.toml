@@ -22,6 +22,7 @@ primary_region = 'lhr'
 
 [env]
   SHOPS_FILE = '/data/shops.json'
+  PROTECTED_DIR = '/data/protected'
 
 [[vm]]
   memory = '1gb'
