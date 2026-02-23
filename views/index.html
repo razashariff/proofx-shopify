@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProofX Content Protection</title>
+  <link rel="stylesheet" href="/public/style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <div class="app-header">
+      <div>
+        <h1>ProofX <span class="badge">Shopify</span></h1>
+      </div>
+      <div style="font-size:13px;color:var(--proofx-text-muted)">
+        <span id="shop-name"></span>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-protected">--</div>
+        <div class="stat-label">Protected Images</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-products">--</div>
+        <div class="stat-label">Products Covered</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-status">--</div>
+        <div class="stat-label">Status</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2>Protected Images</h2>
+          <div class="btn-group" style="margin:0">
+            <button class="btn btn-primary btn-sm" onclick="protectAll()" id="btn-protect-all">
+              Protect All Products
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="loadShopData()">
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div id="protected-loading" class="loading-overlay">
+          <span class="spinner"></span> Loading...
+        </div>
+
+        <div id="protected-empty" class="empty-state" style="display:none">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          </svg>
+          <h3>No protected images yet</h3>
+          <p>Click "Protect All Products" to scan your store, or protection will happen automatically when you add or update products.</p>
+        </div>
+
+        <div id="protected-table" class="table-container" style="display:none">
+          <table>
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Product</th>
+                <th>Content ID</th>
+                <th>Protected</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="protected-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="tab-settings" class="tab-content">
+      <div class="card">
+        <h2>ProofX Configuration</h2>
+        <p>
+          Connect your ProofX account to automatically protect product images with
+          cryptographic signatures. Get your Creator ID and API Key from
+          <a href="https://proofx.co.uk/developer" target="_blank" rel="noopener"
+             style="color:var(--proofx-success);text-decoration:none;font-weight:500">
+            proofx.co.uk/developer
+          </a>.
+        </p>
+
+        <form id="settings-form" onsubmit="saveSettings(event)">
+          <div class="form-group">
+            <label for="creator-id">Creator ID</label>
+            <input type="text" id="creator-id" placeholder="e.g. c1c15c6c"
+                   autocomplete="off" spellcheck="false" />
+            <div class="help-text">
+              Your unique ProofX creator identifier. Found on your ProofX dashboard.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="api-key">API Key</label>
+            <input type="password" id="api-key" placeholder="pk_live_..."
+                   autocomplete="off" spellcheck="false" />
+            <div class="help-text">
+              Optional. Allows higher rate limits and access to premium features.
+            </div>
+          </div>
+
+          <div class="btn-group">
+            <button type="submit" class="btn btn-primary" id="btn-save">
+              Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>How It Works</h2>
+        <div style="font-size:14px;color:var(--proofx-text-muted);line-height:1.8">
+          <p><strong>1. Automatic Protection</strong> — When you create or update a product,
+             ProofX automatically downloads each image, computes its SHA-256 hash,
+             and registers it with a cryptographic signature.</p>
+          <p style="margin-top:8px"><strong>2. Verification</strong> — Each protected image gets a unique
+             Content ID. Anyone can verify the image's authenticity and ownership
+             at proofx.co.uk/verify.</p>
+          <p style="margin-top:8px"><strong>3. Proof of Ownership</strong> — The cryptographic signature
+             proves you were the original publisher, with a precise timestamp.
+             This is admissible evidence in IP disputes.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>About ProofX</h2>
+        <p>
+          ProofX is a content protection platform that uses PKI cryptography
+          to create tamper-proof ownership records for digital content.
+          <a href="https://proofx.co.uk" target="_blank" rel="noopener"
+             style="color:var(--proofx-success)">Learn more</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Verify Modal -->
+  <div id="verify-modal" class="modal-overlay" style="display:none" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Verification Result</h2>
+      <div id="verify-result" class="verify-result">
+        <div class="loading-overlay">
+          <span class="spinner"></span> Verifying...
+        </div>
+      </div>
+      <div class="btn-group" style="justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('verify-modal').style.display='none'">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shopify App Bridge -->
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge/3/app-bridge.js"></script>
+
+  <script>
+    // ---------------------------------------------------------------------------
+    // Config injected by server
+    // ---------------------------------------------------------------------------
+    const SHOPIFY_API_KEY = "__SHOPIFY_API_KEY__";
+    const SHOP_DOMAIN = "__SHOP_DOMAIN__";
+    const HOST_ENCODED = "__HOST__";
+
+    // ---------------------------------------------------------------------------
+    // App Bridge initialization
+    // ---------------------------------------------------------------------------
+    let appBridge = null;
+    try {
+      if (window["app-bridge"]) {
+        const AppBridge = window["app-bridge"];
+        appBridge = AppBridge.createApp({
+          apiKey: SHOPIFY_API_KEY,
+          host: HOST_ENCODED,
+        });
+        console.log("App Bridge initialized");
+      }
+    } catch (e) {
+      console.warn("App Bridge initialization skipped:", e.message);
+    }
+
+    // ---------------------------------------------------------------------------
+    // State
+    // ---------------------------------------------------------------------------
+    let shopData = null;
+
+    // ---------------------------------------------------------------------------
+    // Tabs
+    // ---------------------------------------------------------------------------
+    function switchTab(tabName) {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach((t) => t.classList.remove("active"));
+      document.querySelector(`[data-tab="${tabName}"]`).classList.add("active");
+      document.getElementById(`tab-${tabName}`).classList.add("active");
+    }
+
+    // ---------------------------------------------------------------------------
+    // Toast
+    // ---------------------------------------------------------------------------
+    function showToast(message, type = "success") {
+      const existing = document.querySelector(".toast");
+      if (existing) existing.remove();
+
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    // ---------------------------------------------------------------------------
+    // API helpers
+    // ---------------------------------------------------------------------------
+    function apiUrl(path) {
+      return `${path}${path.includes("?") ? "&" : "?"}shop=${encodeURIComponent(SHOP_DOMAIN)}`;
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(apiUrl(path));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(data.error || `Request failed: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(apiUrl(path), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, shop: SHOP_DOMAIN }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(data.error || `Request failed: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    async function apiDelete(path) {
+      const res = await fetch(apiUrl(path), { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(data.error || `Request failed: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // ---------------------------------------------------------------------------
+    // Load shop data
+    // ---------------------------------------------------------------------------
+    async function loadShopData() {
+      try {
+        shopData = await apiGet("/api/shop");
+
+        // Update header
+        document.getElementById("shop-name").textContent = shopData.shop;
+
+        // Update stats
+        const images = shopData.protectedImages || [];
+        const uniqueProducts = new Set(images.map((i) => i.productId));
+
+        document.getElementById("stat-protected").textContent = images.length;
+        document.getElementById("stat-products").textContent = uniqueProducts.size;
+        document.getElementById("stat-status").textContent = shopData.creatorId
+          ? "Active"
+          : "Setup Required";
+        document.getElementById("stat-status").style.color = shopData.creatorId
+          ? "var(--proofx-success)"
+          : "var(--proofx-danger)";
+
+        // Update settings form
+        document.getElementById("creator-id").value = shopData.creatorId || "";
+        document.getElementById("api-key").placeholder = shopData.hasApiKey
+          ? shopData.apiKey
+          : "pk_live_...";
+
+        // Render protected images
+        renderProtectedImages(images);
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Render protected images table
+    // ---------------------------------------------------------------------------
+    function renderProtectedImages(images) {
+      const loading = document.getElementById("protected-loading");
+      const empty = document.getElementById("protected-empty");
+      const table = document.getElementById("protected-table");
+      const tbody = document.getElementById("protected-tbody");
+
+      loading.style.display = "none";
+
+      if (!images || images.length === 0) {
+        empty.style.display = "block";
+        table.style.display = "none";
+        return;
+      }
+
+      empty.style.display = "none";
+      table.style.display = "block";
+
+      // Sort by protectedAt descending
+      const sorted = [...images].sort(
+        (a, b) => new Date(b.protectedAt) - new Date(a.protectedAt)
+      );
+
+      tbody.innerHTML = sorted
+        .map(
+          (img) => `
+        <tr>
+          <td>
+            <img src="${escapeHtml(img.imageSrc)}" alt="" class="img-thumb"
+                 onerror="this.style.display='none'" />
+          </td>
+          <td>
+            <div style="font-weight:500;font-size:13px">${escapeHtml(img.productTitle)}</div>
+            <div style="font-size:11px;color:var(--proofx-text-muted)">ID: ${img.productId}</div>
+          </td>
+          <td class="content-id-cell">${escapeHtml(img.contentId)}</td>
+          <td style="font-size:12px;color:var(--proofx-text-muted)">
+            ${formatDate(img.protectedAt)}
+          </td>
+          <td>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-primary btn-sm" onclick="verifyContent('${escapeHtml(img.contentId)}')">
+                Verify
+              </button>
+              <a href="https://proofx.co.uk/verify?id=${encodeURIComponent(img.contentId)}"
+                 target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+                View
+              </a>
+              <button class="btn btn-danger btn-sm" onclick="removeProtected('${escapeHtml(img.contentId)}')"
+                      title="Remove from list">
+                &times;
+              </button>
+            </div>
+          </td>
+        </tr>
+      `
+        )
+        .join("");
+    }
+
+    // ---------------------------------------------------------------------------
+    // Save settings
+    // ---------------------------------------------------------------------------
+    async function saveSettings(e) {
+      e.preventDefault();
+
+      const creatorId = document.getElementById("creator-id").value.trim();
+      const apiKey = document.getElementById("api-key").value.trim();
+
+      if (!creatorId) {
+        showToast("Creator ID is required", "error");
+        return;
+      }
+
+      const btn = document.getElementById("btn-save");
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        const body = { creatorId };
+        if (apiKey) body.apiKey = apiKey;
+
+        await apiPost("/api/settings", body);
+        showToast("Settings saved successfully");
+        await loadShopData();
+      } catch (err) {
+        showToast(err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save Settings";
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Protect all products
+    // ---------------------------------------------------------------------------
+    async function protectAll() {
+      const btn = document.getElementById("btn-protect-all");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Scanning...';
+
+      try {
+        const result = await apiPost("/api/protect-all", {});
+        showToast(result.message);
+        await loadShopData();
+      } catch (err) {
+        showToast(err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Protect All Products";
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Verify content
+    // ---------------------------------------------------------------------------
+    async function verifyContent(contentId) {
+      const modal = document.getElementById("verify-modal");
+      const result = document.getElementById("verify-result");
+
+      modal.style.display = "flex";
+      result.innerHTML = '<div class="loading-overlay"><span class="spinner"></span> Verifying...</div>';
+
+      try {
+        const data = await apiGet(`/api/verify/${contentId}`);
+
+        result.innerHTML = `
+          <div style="text-align:center;margin-bottom:16px">
+            <span class="status-badge verified" style="font-size:14px;padding:4px 16px">
+              Verified
+            </span>
+          </div>
+          <div class="field">
+            <span class="field-label">Content ID</span>
+            <span class="field-value">${escapeHtml(data.content_id || contentId)}</span>
+          </div>
+          <div class="field">
+            <span class="field-label">Creator</span>
+            <span class="field-value">${escapeHtml(data.creator_id || "")}</span>
+          </div>
+          <div class="field">
+            <span class="field-label">Title</span>
+            <span class="field-value">${escapeHtml(data.title || "")}</span>
+          </div>
+          <div class="field">
+            <span class="field-label">Content Type</span>
+            <span class="field-value">${escapeHtml(data.content_type || "image")}</span>
+          </div>
+          <div class="field">
+            <span class="field-label">Registered</span>
+            <span class="field-value">${data.registered_at ? formatDate(data.registered_at) : "N/A"}</span>
+          </div>
+          <div class="field">
+            <span class="field-label">Signature</span>
+            <span class="field-value" style="font-size:11px;font-family:monospace">${escapeHtml(
+              (data.signature || "").substring(0, 32) + "..."
+            )}</span>
+          </div>
+          <div style="margin-top:12px;text-align:center">
+            <a href="https://proofx.co.uk/verify?id=${encodeURIComponent(contentId)}"
+               target="_blank" rel="noopener" class="btn btn-primary btn-sm">
+              View Full Certificate
+            </a>
+          </div>
+        `;
+      } catch (err) {
+        result.innerHTML = `
+          <div style="text-align:center;margin-bottom:16px">
+            <span class="status-badge error" style="font-size:14px;padding:4px 16px">
+              Verification Failed
+            </span>
+          </div>
+          <p style="text-align:center;color:var(--proofx-text-muted);font-size:14px">
+            ${escapeHtml(err.message)}
+          </p>
+        `;
+      }
+    }
+
+    function closeModal(e) {
+      if (e.target === e.currentTarget) {
+        e.currentTarget.style.display = "none";
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Remove protected entry
+    // ---------------------------------------------------------------------------
+    async function removeProtected(contentId) {
+      if (!confirm("Remove this image from the protected list? The ProofX signature will remain valid.")) {
+        return;
+      }
+
+      try {
+        await apiDelete(`/api/protected/${contentId}`);
+        showToast("Entry removed");
+        await loadShopData();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Utilities
+    // ---------------------------------------------------------------------------
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function formatDate(dateStr) {
+      try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      } catch {
+        return dateStr;
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Init
+    // ---------------------------------------------------------------------------
+    loadShopData();
+  </script>
+</body>
+</html>

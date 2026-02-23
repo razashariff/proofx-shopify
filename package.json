@@ -1,0 +1,22 @@
+{
+  "name": "proofx-shopify",
+  "version": "1.0.0",
+  "description": "ProofX content protection for Shopify — auto-protect product images with cryptographic signatures",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0",
+    "uuid": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
