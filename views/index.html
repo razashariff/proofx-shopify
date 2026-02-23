@@ -179,6 +179,7 @@
     const SHOPIFY_API_KEY = "__SHOPIFY_API_KEY__";
     const SHOP_DOMAIN = "__SHOP_DOMAIN__";
     const HOST_ENCODED = "__HOST__";
+    const APP_HOST = "__APP_HOST__";
 
     // ---------------------------------------------------------------------------
     // App Bridge initialization
@@ -343,9 +344,10 @@
           </td>
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <a href="/api/download/${encodeURIComponent(img.contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}"
+              <a href="${APP_HOST}/api/download/${encodeURIComponent(img.contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}"
                  class="btn btn-primary btn-sm"
-                 title="Download protected image">
+                 title="Download protected image"
+                 target="_blank">
                 Download
               </a>
               <button class="btn btn-secondary btn-sm" onclick="verifyContent('${escapeHtml(img.contentId)}')">

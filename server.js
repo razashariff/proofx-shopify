@@ -656,32 +656,32 @@ app.get("/api/download/:contentId", async (req, res) => {
   // 2. No local file — find the original image URL and proxy it
   const shop = req.query.shop;
   const shopData = shop ? getShop(shop) : null;
-  let imageSrc = null;
+  let entry = null;
 
   if (shopData) {
-    const entry = (shopData.protectedImages || []).find(
+    entry = (shopData.protectedImages || []).find(
       (p) => p.contentId === contentId
     );
-    if (entry) imageSrc = entry.imageSrc;
-  } else {
+  }
+  if (!entry) {
     // Search all shops
     for (const s of Object.values(shops)) {
-      const entry = (s.protectedImages || []).find(
+      entry = (s.protectedImages || []).find(
         (p) => p.contentId === contentId
       );
-      if (entry) { imageSrc = entry.imageSrc; break; }
+      if (entry) break;
     }
   }
 
-  if (!imageSrc) {
+  if (!entry || !entry.imageSrc) {
     return res.status(404).json({ error: "Image not found" });
   }
 
   try {
-    const imgRes = await fetch(imageSrc);
+    const imgRes = await fetch(entry.imageSrc);
     if (!imgRes.ok) throw new Error(`Fetch failed: ${imgRes.status}`);
 
-    const ext = path.extname(new URL(imageSrc).pathname).toLowerCase() || ".png";
+    const ext = path.extname(new URL(entry.imageSrc).pathname).toLowerCase() || ".png";
     const mime =
       ext === ".jpg" || ext === ".jpeg"
         ? "image/jpeg"
@@ -689,11 +689,15 @@ app.get("/api/download/:contentId", async (req, res) => {
         ? "image/webp"
         : "image/png";
 
+    // Build a human-readable filename: ProofX-ProductTitle-contentId.ext
+    const safeName = (entry.productTitle || "image")
+      .replace(/[^a-zA-Z0-9 _-]/g, "")
+      .replace(/\s+/g, "-")
+      .substring(0, 50);
+    const fileName = `ProofX-${safeName}-${contentId}${ext}`;
+
     res.setHeader("Content-Type", mime);
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="proofx-${contentId}${ext}"`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     imgRes.body.pipe(res);
   } catch (err) {
     res.status(500).json({ error: "Failed to download image" });
@@ -827,7 +831,8 @@ app.get("/", (req, res) => {
   const injected = html
     .replace("__SHOPIFY_API_KEY__", SHOPIFY_API_KEY)
     .replace("__SHOP_DOMAIN__", shop)
-    .replace("__HOST__", host || "");
+    .replace("__HOST__", host || "")
+    .replace("__APP_HOST__", HOST);
 
   res.send(injected);
 });
