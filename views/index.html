@@ -428,10 +428,14 @@
       try {
         const data = await apiGet(`/api/verify/${contentId}`);
 
+        const content = data.content || {};
+        const creator = data.creator || {};
+        const sig = data.signature || {};
+
         result.innerHTML = `
           <div style="text-align:center;margin-bottom:16px">
             <span class="status-badge verified" style="font-size:14px;padding:4px 16px">
-              Verified
+              ${data.valid ? "Verified" : "Signature Invalid"}
             </span>
           </div>
           <div class="field">
@@ -440,25 +444,25 @@
           </div>
           <div class="field">
             <span class="field-label">Creator</span>
-            <span class="field-value">${escapeHtml(data.creator_id || "")}</span>
+            <span class="field-value">${escapeHtml(creator.name || creator.id || "")}</span>
           </div>
           <div class="field">
             <span class="field-label">Title</span>
-            <span class="field-value">${escapeHtml(data.title || "")}</span>
+            <span class="field-value">${escapeHtml(content.title || "")}</span>
           </div>
           <div class="field">
             <span class="field-label">Content Type</span>
-            <span class="field-value">${escapeHtml(data.content_type || "image")}</span>
+            <span class="field-value">${escapeHtml(content.content_type || "image")}</span>
           </div>
           <div class="field">
             <span class="field-label">Registered</span>
-            <span class="field-value">${data.registered_at ? formatDate(data.registered_at) : "N/A"}</span>
+            <span class="field-value">${content.registered_at ? formatDate(content.registered_at) : "N/A"}</span>
           </div>
           <div class="field">
             <span class="field-label">Signature</span>
             <span class="field-value" style="font-size:11px;font-family:monospace">${escapeHtml(
-              (data.signature || "").substring(0, 32) + "..."
-            )}</span>
+              sig.algorithm || ""
+            )} — ${sig.verified ? "Valid" : "Invalid"}</span>
           </div>
           <div style="margin-top:12px;text-align:center">
             <a href="https://proofx.co.uk/verify?id=${encodeURIComponent(contentId)}"

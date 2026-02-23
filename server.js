@@ -166,7 +166,9 @@ async function proofxSignHash({ contentHash, creatorId, apiKey, title }) {
 }
 
 async function proofxVerify(contentId) {
-  const res = await fetch(`${PROOFX_API_BASE}/api/content/${contentId}`);
+  const res = await fetch(
+    `${PROOFX_API_BASE}/api/content/${contentId}/verify`
+  );
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`ProofX verify failed (${res.status}): ${text}`);
