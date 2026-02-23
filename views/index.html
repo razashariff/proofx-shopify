@@ -344,12 +344,10 @@
           </td>
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <a href="${APP_HOST}/api/download/${encodeURIComponent(img.contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}"
-                 class="btn btn-primary btn-sm"
-                 title="Download protected image"
-                 target="_blank">
+              <button class="btn btn-primary btn-sm" onclick="downloadImage('${escapeHtml(img.contentId)}', '${escapeHtml(img.productTitle)}')"
+                 title="Download protected image">
                 Download
-              </a>
+              </button>
               <button class="btn btn-secondary btn-sm" onclick="verifyContent('${escapeHtml(img.contentId)}')">
                 Verify
               </button>
@@ -495,6 +493,34 @@
     function closeModal(e) {
       if (e.target === e.currentTarget) {
         e.currentTarget.style.display = "none";
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Download protected image (blob download to bypass iframe restrictions)
+    // ---------------------------------------------------------------------------
+    async function downloadImage(contentId, productTitle) {
+      try {
+        const url = `${APP_HOST}/api/download/${encodeURIComponent(contentId)}?shop=${encodeURIComponent(SHOP_DOMAIN)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Download failed");
+
+        const blob = await res.blob();
+        const ext = blob.type.includes("jpeg") ? ".jpg" : blob.type.includes("webp") ? ".webp" : ".png";
+        const safeName = (productTitle || "image").replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "-").substring(0, 50);
+        const fileName = `ProofX-${safeName}-${contentId}${ext}`;
+
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+
+        showToast(`Downloaded: ${fileName}`);
+      } catch (err) {
+        showToast("Download failed: " + err.message, "error");
       }
     }
 
